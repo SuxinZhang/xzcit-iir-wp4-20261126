@@ -21,6 +21,7 @@ try {
 <link rel="stylesheet" href="/styles/layout.css">
 <link rel="stylesheet" href="/styles/micro.css">
 <link rel="stylesheet" href="/styles/inspection.css">
+<link rel="stylesheet" href="/styles/ota.css">
 </head>
 <body>
 
@@ -43,6 +44,10 @@ try {
     <a href="#/inspection" class="nav-item" data-page="inspection">
       <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.8" cy="6.8" r="4.2" fill="none" stroke-width="1.6"/><path d="M10 10l4 4" stroke-width="1.6" stroke-linecap="round"/></svg>
       <span>巡检</span>
+    </a>
+    <a href="#/ota" class="nav-item" data-page="ota">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v7M5 6l3 3 3-3M3 12.5h10" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>系统升级</span>
     </a>
     <a href="#/logs" class="nav-item" data-page="logs">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3.5h10M3 6.5h10M3 9.5h7M3 12.5h5" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
@@ -340,6 +345,46 @@ try {
       </div>
     </section>
 
+    <!-- ============ 系统升级（WP6 OTA） ============ -->
+    <section class="page" id="page-ota" aria-labelledby="page-title" inert>
+      <div class="page-inner">
+        <div class="ota-grid">
+          <article class="card" data-card>
+            <h3>STM32 底盘固件</h3>
+            <div class="ota-version"><span>当前版本</span><strong id="ota-fw-version">—</strong></div>
+          </article>
+          <article class="card" data-card>
+            <h3>上位机软件</h3>
+            <div class="ota-version"><span>当前版本</span><strong id="ota-master-version">—</strong></div>
+          </article>
+          <article class="card" data-card>
+            <h3>RKNN 缺陷模型</h3>
+            <div class="ota-version"><span>当前版本</span><strong id="ota-model-version">—</strong></div>
+          </article>
+        </div>
+        <div class="ins-grid">
+          <article class="card" data-card>
+            <h3>五重安全互锁 <span class="st" id="ota-busy">空闲</span></h3>
+            <ul class="ota-interlocks" id="ota-interlocks"><li class="st">加载中…</li></ul>
+          </article>
+          <article class="card" data-card>
+            <h3>离线升级包</h3>
+            <div class="ota-drop" id="ota-drop">拖拽 .tar.gz 升级包到此，或选择文件
+              <input id="ota-file" type="file" accept=".tar.gz,application/gzip">
+            </div>
+            <p class="map-note" id="ota-upload-result">尚未上传升级包</p>
+            <div class="btn-row">
+              <button id="ota-apply-btn" class="btn primary" type="button" disabled>开始升级</button>
+              <button id="ota-rollback-btn" class="btn" type="button">回滚上一版本</button>
+            </div>
+            <div class="ota-progress-track"><div class="ota-progress-bar" id="ota-progress-bar"></div></div>
+            <p class="map-note">阶段 <span id="ota-stage">—</span> · <span id="ota-progress">0%</span></p>
+            <pre class="ota-log" id="ota-log">等待操作…</pre>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <!-- ============ 日志（免登录） ============ -->
     <section class="page" id="page-logs" aria-labelledby="page-title" inert>
       <div class="page-inner">
@@ -386,6 +431,7 @@ try {
 <script src="/js/canvas-map.js"></script>
 <script src="/js/spotlight.js"></script>
 <script src="/js/inspection.js"></script>
+<script src="/js/ota.js"></script>
 <script src="/js/app.js"></script>
 </body>
 </html>

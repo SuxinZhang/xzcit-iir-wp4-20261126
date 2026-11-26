@@ -210,7 +210,7 @@
 
   /* ================= 路由（#/overview /control /inspection /logs） ================= */
 
-  var PAGE_TITLES = { overview: '概览', control: '控制', inspection: '巡检', logs: '日志' };
+  var PAGE_TITLES = { overview: '概览', control: '控制', inspection: '巡检', ota: '系统升级', logs: '日志' };
 
   function pageFromHash() {
     var h = location.hash.replace(/^#\/?/, '');
@@ -246,6 +246,7 @@
 
     C.Spotlight.refresh();
     C.WS.setPage(page);
+    if (C.OTA && C.OTA.setPage) C.OTA.setPage(page);
     // The inspection centre owns its gateway connection and refresh timer.
     // 巡检中心自行管理网关连接与刷新定时器。
     if (C.Inspection && C.Inspection.setPage) C.Inspection.setPage(page);

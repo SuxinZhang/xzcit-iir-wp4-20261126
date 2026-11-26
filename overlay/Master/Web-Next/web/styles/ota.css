@@ -1,0 +1,14 @@
+/* OTA management page styles.
+ * OTA 管理页样式。 */
+.ota-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.ota-version { padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--bg2); }
+.ota-version strong { display: block; font-size: 1.4rem; margin-top: 6px; }
+.ota-interlocks { list-style: none; margin: 8px 0 0; padding: 0; }
+.ota-interlocks li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+.ota-interlocks li.ok b { color: var(--ok, #2ecc71); }
+.ota-interlocks li.bad b { color: var(--bad, #e74c3c); }
+.ota-drop { display: grid; place-items: center; min-height: 110px; border: 1px dashed var(--line); border-radius: var(--radius-s); color: var(--dim); text-align: center; }
+.ota-progress-track { height: 8px; border-radius: 999px; background: var(--bg2); overflow: hidden; margin: 8px 0; }
+.ota-progress-bar { height: 100%; width: 0; background: var(--accent); transition: width .2s ease; }
+.ota-log { min-height: 120px; max-height: 260px; overflow: auto; white-space: pre-wrap; font: 12px/1.45 monospace; background: #0b1220; color: #cfe3ff; border-radius: var(--radius-s); padding: 10px; }
+@media (max-width: 760px) { .ota-grid { grid-template-columns: 1fr; } }

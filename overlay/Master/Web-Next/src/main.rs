@@ -118,6 +118,10 @@ const INSPECTION_JS: &str = include_str!("../web/js/inspection.js");
 const STUDENT_HTML: &str = include_str!("../web/student.html");
 const STUDENT_CSS: &str = include_str!("../web/styles/student.css");
 const STUDENT_JS: &str = include_str!("../web/js/student.js");
+// WP6 OTA management page assets.
+// WP6 OTA 管理页面资源。
+const OTA_CSS: &str = include_str!("../web/styles/ota.css");
+const OTA_JS: &str = include_str!("../web/js/ota.js");
 
 const NO_STORE: &str = "no-store";
 
@@ -263,6 +267,10 @@ async fn main() {
             get(|| async { static_asset(STUDENT_CSS, CSS_TYPE) }),
         )
         .route(
+            "/styles/ota.css",
+            get(|| async { static_asset(OTA_CSS, CSS_TYPE) }),
+        )
+        .route(
             "/js/app.js",
             get(|| async { static_asset(APP_JS, JS_TYPE) }),
         )
@@ -294,6 +302,10 @@ async fn main() {
         .route(
             "/js/student.js",
             get(|| async { static_asset(STUDENT_JS, JS_TYPE) }),
+        )
+        .route(
+            "/js/ota.js",
+            get(|| async { static_asset(OTA_JS, JS_TYPE) }),
         )
         .route(
             "/fonts/HarmonyOSSansSC-Regular.woff2",
