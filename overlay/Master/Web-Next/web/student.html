@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Student H5 view follows the same light/dark design tokens as the console.
+     学生端 H5 视图沿用与控制台相同的明暗设计令牌。 -->
+<meta name="color-scheme" content="light dark">
+<title>XZCIT-IIR 学生智能终端</title>
+<link rel="stylesheet" href="/styles/tokens.css">
+<link rel="stylesheet" href="/styles/student.css">
+</head>
+<body class="student-page">
+<header class="student-top">
+  <div><span class="brand-dot" aria-hidden="true"></span> XZCIT-IIR 学生智能终端</div>
+  <span class="chip" id="student-status">连接中…</span>
+</header>
+<main class="student-main">
+  <section class="card student-hero" aria-labelledby="student-latest-title">
+    <div class="student-hero-head">
+      <h1 id="student-latest-title">最新巡检抓拍</h1>
+      <span class="st" id="student-time">—</span>
+    </div>
+    <div class="student-empty" id="student-empty">暂无抓拍数据，等待巡检机器人上传…</div>
+    <img id="student-image" class="student-image" alt="最新巡检标注图" hidden>
+    <p class="student-meta" id="student-meta" hidden></p>
+  </section>
+  <section class="card" aria-labelledby="student-defect-title">
+    <h2 id="student-defect-title">缺陷研判报告</h2>
+    <ul class="student-defects" id="student-defects"><li class="st">暂无数据</li></ul>
+  </section>
+  <section class="card" aria-labelledby="student-history-title">
+    <h2 id="student-history-title">历史回看</h2>
+    <ol class="student-history" id="student-history"><li class="st">暂无记录</li></ol>
+  </section>
+</main>
+<script src="/js/student.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!-- Typed inspection interfaces for the XZCIT-IIR WP4 vision pipeline.
+     用于 XZCIT-IIR WP4 视觉链路的类型化巡检接口。 -->
+<package format="3">
+  <name>iir_interfaces</name>
+  <version>0.1.0</version>
+  <description>Typed msg/srv contracts shared by RKNN vision, the gateway, and Web-Next.
+    由 RKNN 视觉、业务网关与 Web-Next 共享的类型化 msg/srv 契约。</description>
+  <maintainer email="snow@example.com">snow</maintainer>
+  <license>Apache-2.0</license>
+  <!-- Build the ROS IDL bindings with the standard rosidl generator pipeline.
+       使用标准 rosidl 生成器流水线构建 ROS IDL 绑定。 -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+  <depend>std_msgs</depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

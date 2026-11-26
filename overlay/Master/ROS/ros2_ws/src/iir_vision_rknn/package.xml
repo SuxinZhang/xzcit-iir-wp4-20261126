@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!-- RKNN power-equipment defect inspection node for XZCIT-IIR WP4.
+     XZCIT-IIR WP4 的 RKNN 电力设备缺陷识别节点。 -->
+<package format="3">
+  <name>iir_vision_rknn</name>
+  <version>0.1.0</version>
+  <description>RK3588S NPU defect detection and inspection capture archive.
+    RK3588S NPU 缺陷检测与巡检抓拍归档。</description>
+  <maintainer email="snow@example.com">snow</maintainer>
+  <license>Apache-2.0</license>
+  <!-- Runtime dependencies are ROS 2 Humble plus NumPy and OpenCV.
+       运行时依赖为 ROS 2 Humble 以及 NumPy、OpenCV。 -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>iir_interfaces</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <test_depend>python3-pytest</test_depend>
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,0 +1,33 @@
+# Trigger one inspection capture from the latest shared camera frame.
+# 从最新的共享相机帧触发一次巡检抓拍。
+# Inspection point identifier; an empty string means an unspecified patrol point.
+# 巡检点标识；空字符串表示未指定的巡逻点。
+string inspection_point
+# Trigger source: manual or patrol.
+# 触发来源：manual 或 patrol。
+string source
+# Persist the original image, annotated image, and JSON result when true.
+# 为 true 时持久化原图、标注图与 JSON 结果。
+bool archive
+---
+# True when a fresh frame was captured and archived successfully.
+# 成功抓拍新鲜图像并完成归档时为 true。
+bool success
+# Human-readable result text.
+# 便于人工阅读的结果说明。
+string message
+# Unique capture identifier; empty on failure.
+# 唯一抓拍标识；失败时为空。
+string capture_id
+# Absolute path of the archived original image; empty when archive is false.
+# 归档原图的绝对路径；archive 为 false 时为空。
+string image_path
+# Absolute path of the archived annotated image; empty when archive is false.
+# 归档标注图的绝对路径；archive 为 false 时为空。
+string annotated_path
+# Full structured result as a UTF-8 JSON string.
+# 完整结构化结果的 UTF-8 JSON 字符串。
+string result_json
+# Typed copy of the same detections for ROS-native consumers.
+# 面向 ROS 原生消费者的同一批检测结果类型化副本。
+DefectArray defects

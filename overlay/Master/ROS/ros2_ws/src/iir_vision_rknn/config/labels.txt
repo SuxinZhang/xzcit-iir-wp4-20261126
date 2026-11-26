@@ -1,0 +1,9 @@
+# Electric-power defect labels consumed by the RKNN detector.
+# RKNN 检测器使用的电力设备缺陷标签。
+# Format: stable_english_key,Chinese display name
+# 格式：稳定英文键,中文显示名
+insulator_defect,绝缘子破损
+rust,金具锈蚀
+oil_leak,设备渗漏油
+broken_wire,导线断股
+foreign_object,异物悬挂

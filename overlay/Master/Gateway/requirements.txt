@@ -1,0 +1,4 @@
+# Gateway runtime dependencies for the XZCIT-IIR WP4 inspection chain.
+# XZCIT-IIR WP4 巡检链路的网关运行时依赖。
+fastapi>=0.110
+uvicorn[standard]>=0.29

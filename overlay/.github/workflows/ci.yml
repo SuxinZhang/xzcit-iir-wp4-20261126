@@ -1,0 +1,409 @@
+# Continuous Integration workflow for XZCIT-IIR / inspection-robot.
+# XZCIT-IIR / inspection-robot 项目的持续集成（CI）工作流配置。
+# Enforces UTF-8/LF encoding gate, CMake host unit tests, STM32 cross-build,
+# Master/ROS 2 regression baseline comparison, and Master/Web-Next checks.
+# 强制执行 UTF-8/LF 编码门禁、CMake 宿主机单测、STM32 交叉编译、
+# Master/ROS 2 测试基线比对及 Master/Web-Next 前后端静态与构建检查。
+
+name: XZCIT-IIR CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'dev/**'
+  pull_request:
+    branches:
+      - main
+      - feat
+      - 'feat/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Keep only the latest CI run per workflow and ref to save runner capacity.
+  # 同一工作流与分支引用仅保留最新一次运行，自动取消排队中的旧运行。
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Detect changed technology stacks to skip unaffected heavy jobs cleanly.
+  # 按目录过滤本次变更涉及的技术栈，避免无关构建任务浪费耗时。
+  changes:
+    name: detect-changes
+    runs-on: ubuntu-24.04
+    outputs:
+      rust:     ${{ steps.filter.outputs.rust }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      ros:      ${{ steps.filter.outputs.ros }}
+      stm32:    ${{ steps.filter.outputs.stm32 }}
+      scripts:  ${{ steps.filter.outputs.scripts }}
+      gateway:  ${{ steps.filter.outputs.gateway }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Filter changed paths by component
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          base: ${{ github.event_name == 'workflow_dispatch' && format('{0}~1', github.sha) || '' }}
+          filters: |
+            rust:
+              - 'Master/Web-Next/**'
+            frontend:
+              - 'Master/Web-Next/web/**'
+              - 'Master/Web-Next/src/main.rs'
+            ros:
+              - 'Master/ROS/**'
+              - 'Master/Web-Next/deploy/**'
+            stm32:
+              - 'App/**'
+              - 'Drivers/**'
+              - 'Core/**'
+              - 'tests/**'
+              - 'cmake/**'
+              - 'CMakeLists.txt'
+              - 'CMakePresets.json'
+              - 'STM32F407xx_FLASH.ld'
+              - 'startup_stm32f407xx.s'
+            scripts:
+              - 'scripts/**'
+              - '.editorconfig'
+              - '.github/workflows/ci.yml'
+            gateway:
+              - 'Master/Gateway/**'
+
+  # Always-on encoding, line-ending, backup-file, and Python syntax gate.
+  # 每次必跑的编码、LF 换行、残留文件拦截与 Python 语法检查门禁。
+  encoding-and-hygiene:
+    name: encoding-and-hygiene
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce UTF-8 (without BOM) and LF line endings
+        run: python3 scripts/check_encoding.py
+
+      - name: Reject newly added backup/Keil artifact files (*.orig / *.bak / *.uvguix.*)
+        env:
+          EVENT_NAME:  ${{ github.event_name }}
+          BEFORE_SHA:  ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA:    ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE="$PR_BASE_SHA"
+          elif [ -n "$BEFORE_SHA" ] && ! [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            BASE="$BEFORE_SHA"
+          else
+            BASE="$(git hash-object -t tree /dev/null)"
+          fi
+          if ! git cat-file -e "$BASE" 2>/dev/null; then
+            BASE="$(git hash-object -t tree /dev/null)"
+          fi
+          ADDED="$(git diff --name-only --diff-filter=A "$BASE" "$HEAD_SHA" || true)"
+          BAD="$(printf '%s\n' "$ADDED" | grep -E '\.(orig|bak)$|\.uvguix\.' || true)"
+          if [ -n "$BAD" ]; then
+            echo "::error::Forbidden backup/Keil cache files detected in added files:"
+            echo "$BAD"
+            exit 1
+          fi
+          echo "Hygiene check passed: no added .orig / .bak / .uvguix.* files."
+
+      - name: Compile-check Python scripts (Master/, scripts/, tests/)
+        run: |
+          set -euo pipefail
+          find Master scripts tests -name "*.py" -type f -print0 | xargs -0 -n1 python3 -m py_compile
+          echo "Python py_compile passed."
+
+  # Build and run pure-C host unit tests + c50c_uart3 interop checks via CMake preset.
+  # 使用 CMake host-test 预设编译并运行纯 C 宿主机单元测试与 c50c_uart3 互操作测试。
+  firmware-host-tests:
+    name: firmware-host-tests
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.stm32 == 'true' || needs.changes.outputs.scripts == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install CMake and Ninja build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends cmake ninja-build gcc
+
+      - name: Configure, build, and run host-test CTest suite
+        run: |
+          cmake --preset host-test
+          cmake --build --preset host-test
+          ctest --preset host-test --output-on-failure
+
+  # Cross-compile STM32F407VET6 firmware once ST HAL SDK files are populated (WP1b).
+  # 在 Core 与 ST HAL SDK 文件补全后执行 STM32F407VET6 固件交叉编译（WP1b）。
+  firmware-stm32-build:
+    name: firmware-stm32-build
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.stm32 == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check whether ST CubeMX HAL SDK prerequisites are populated
+        id: sdk
+        run: |
+          if [ -f Core/Src/main.c ] && [ -d Drivers/STM32F4xx_HAL_Driver/Src ] && [ -f STM32F407xx_FLASH.ld ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "STM32 HAL SDK files not yet populated (WP1a host-only stage); skipping .elf build."
+          fi
+
+      - name: Install ARM GCC toolchain, CMake, and Ninja
+        if: steps.sdk.outputs.ready == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Cross-compile stm32-diff-release and verify firmware outputs
+        if: steps.sdk.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          cmake --preset stm32-diff-release
+          cmake --build --preset stm32-diff-release
+          test -f build/stm32-diff-release/xzcit_iir_diff.elf
+          test -f build/stm32-diff-release/xzcit_iir_diff.hex
+          test -f build/stm32-diff-release/xzcit_iir_diff.bin
+          ls -lh build/stm32-diff-release/xzcit_iir_diff.*
+
+  # Rust Axum Web-Next checks inherited from XZCIT-IIR baseline.
+  # 继承自 XZCIT-IIR 基线的 Rust Axum Web-Next 后端代码规范与测试检查。
+  rust-web-next:
+    name: rust-web-next
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    defaults:
+      run:
+        working-directory: Master/Web-Next
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Master/Web-Next
+
+      - name: cargo fmt --check
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -W dead_code -W unused_imports -W unused_variables
+
+      - name: cargo test
+        # The ROS bridge test suite shares process-wide OnceLock state, so it
+        # must run serially to stay deterministic.
+        # ROS 桥测试套件共享进程级 OnceLock 状态，必须串行执行以保证确定性。
+        run: cargo test -- --test-threads=1
+
+  # Native JavaScript and static asset registration checks for Master/Web-Next/web.
+  # 对 Master/Web-Next/web 原生前端脚本及静态资源嵌入注册执行校验。
+  web-frontend:
+    name: web-frontend
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Syntax-check web/js/*.js using node --check
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/jscheck
+          status=0
+          for f in Master/Web-Next/web/js/*.js; do
+            base="$(basename "${f%.js}").mjs"
+            cp "$f" "/tmp/jscheck/$base"
+            if ! node --check "/tmp/jscheck/$base"; then
+              echo "::error::JS syntax check failed: $f"
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: Verify static web assets are registered in src/main.rs and referenced
+        run: |
+          python3 - <<'PYEOF'
+          import pathlib, re, sys
+          root = pathlib.Path("Master/Web-Next")
+          mainrs = (root / "src/main.rs").read_text(encoding="utf-8")
+          errors = []
+          registered = set(re.findall(
+              r'include_(?:str|bytes)!\("\.\./(web/[^"]+)"\)', mainrs))
+          # Every HTML entry point may reference embedded JS/CSS assets.
+          # 每个 HTML 入口都可以引用内嵌的 JS/CSS 资源。
+          referenced = set()
+          for html in sorted((root / "web").glob("*.html")):
+              referenced |= set(re.findall(
+                  r'(?:href|src)\s*=\s*["\']?/((?:js|styles|fonts)/[\w.\-]+)',
+                  html.read_text(encoding="utf-8")))
+          for css in (root / "web/styles").glob("*.css"):
+              referenced |= set(re.findall(
+                  r'url\(\s*["\']?/((?:fonts|styles|js)/[^)"\']+)',
+                  css.read_text(encoding="utf-8")))
+          actual = {f"web/{p.relative_to(root / 'web')}"
+                    for d in ("js", "styles", "fonts")
+                    for p in (root / "web" / d).iterdir() if p.is_file()}
+          for f in sorted(actual):
+              if f not in registered:
+                  errors.append(f"[UNREGISTERED] {f} missing in src/main.rs")
+              ref = f[len("web/"):]
+              if ref not in referenced:
+                  errors.append(f"[UNREFERENCED] {f} missing in an HTML entry point or CSS")
+          print(f"registered={len(registered)} referenced={len(referenced)} actual={len(actual)}")
+          for e in errors:
+              print(f"::error::{e}")
+          sys.exit(1 if errors else 0)
+          PYEOF
+
+  # FastAPI inspection gateway tests using the synthetic capture backend (WP4).
+  # 使用合成抓拍后端验证 FastAPI 巡检业务网关（WP4）。
+  gateway-python:
+    name: gateway-python
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.gateway == 'true'
+    defaults:
+      run:
+        working-directory: Master/Gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install gateway test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest httpx
+
+      - name: Run gateway unit and end-to-end tests
+        run: python -m pytest tests -q
+
+  # ROS 2 Humble build and baseline regression comparison against .github/ros2-test-baseline.txt.
+  # ROS 2 Humble 编译与针对 .github/ros2-test-baseline.txt 的零退化测试比对。
+  ros2-python:
+    name: ros2-python
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.ros == 'true'
+    container:
+      image: ros:humble-ros-base
+    defaults:
+      run:
+        shell: bash
+    env:
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: "safe.directory"
+      GIT_CONFIG_VALUE_0: "*"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install ruff and colcon tools if missing
+        run: |
+          set -euo pipefail
+          apt-get update -qq
+          apt-get install -y -qq python3-pip >/dev/null
+          pip3 install --quiet ruff
+          command -v colcon >/dev/null 2>&1 || {
+            apt-get install -y -qq --no-install-recommends python3-colcon-common-extensions >/dev/null
+          }
+
+      - name: Install Nav2 costmap and inspection interface dependencies
+        run: |
+          apt-get install -y -qq --no-install-recommends \
+            ros-humble-nav2-costmap-2d ros-humble-sensor-msgs-py \
+            ros-humble-tf2-ros ros-humble-rosidl-default-generators \
+            python3-yaml python3-numpy python3-opencv python3-pytest
+
+      - name: Run colcon build for Master/ROS/ros2_ws
+        run: |
+          source /opt/ros/humble/setup.bash
+          cd Master/ROS/ros2_ws
+          colcon build --symlink-install
+
+      - name: Run colcon test and compare against ROS 2 regression baseline
+        run: |
+          source /opt/ros/humble/setup.bash
+          cd Master/ROS/ros2_ws
+          source install/setup.bash
+          colcon test --event-handlers console_direct- || true
+          colcon test-result --verbose 2>&1 | tail -40 || true
+          colcon test-result --test-result-base build/iir_navigation --verbose
+          colcon test-result --test-result-base build/iir_navigation_vision --verbose
+          cd "$GITHUB_WORKSPACE"
+          python3 .github/scripts/compare_ros2_tests.py
+
+  # Aggregated CI status gate requiring every active or skipped job not to fail.
+  # 汇总门禁检查：要求全部前置任务均处于 success 或 skipped 状态。
+  ci-gate:
+    name: ci-gate
+    runs-on: ubuntu-24.04
+    needs:
+      - changes
+      - encoding-and-hygiene
+      - firmware-host-tests
+      - firmware-stm32-build
+      - rust-web-next
+      - web-frontend
+      - gateway-python
+      - ros2-python
+    if: always()
+    steps:
+      - name: Verify all required CI jobs succeeded or were safely skipped
+        env:
+          R_CHANGES:  ${{ needs.changes.result }}
+          R_HYGIENE:  ${{ needs.encoding-and-hygiene.result }}
+          R_HOST:     ${{ needs.firmware-host-tests.result }}
+          R_STM32:    ${{ needs.firmware-stm32-build.result }}
+          R_RUST:     ${{ needs.rust-web-next.result }}
+          R_FRONTEND: ${{ needs.web-frontend.result }}
+          R_GATEWAY:  ${{ needs.gateway-python.result }}
+          R_ROS:      ${{ needs.ros2-python.result }}
+        run: |
+          set -euo pipefail
+          fail=0
+          check() {
+            if [ "$2" = "failure" ] || [ "$2" = "cancelled" ]; then
+              echo "::error::CI gate failed: job [$1] finished with $2"
+              fail=1
+            else
+              echo "Job [$1]: $2 (ok)"
+            fi
+          }
+          check "changes"              "$R_CHANGES"
+          check "encoding-and-hygiene" "$R_HYGIENE"
+          check "firmware-host-tests"  "$R_HOST"
+          check "firmware-stm32-build" "$R_STM32"
+          check "rust-web-next"        "$R_RUST"
+          check "web-frontend"         "$R_FRONTEND"
+          check "gateway-python"       "$R_GATEWAY"
+          check "ros2-python"          "$R_ROS"
+          if [ "$fail" -ne 0 ]; then
+            exit 1
+          fi
+          echo "ci-gate passed."
